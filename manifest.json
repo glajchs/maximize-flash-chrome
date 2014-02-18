@@ -1,11 +1,11 @@
 {
     "manifest_version": 2,
     "name": "Maximize Flash",
-    "version": "0.1",
-    "description": "This plugin allows you to make a flash video use as much screen size as the tab it's in and the aspect ratio allows.",
+    "version" : "1.0",
+    "description": "Make a flash video use as much screen size as the tab it's in and the aspect ratio allows, without causing the video to reload.",
     "author": "Scott Glajch",
     "background": {
-        "scripts": [ "background.js" ]
+        "scripts": [ "jquery-1.10.2.js", "lodash.min.js", "background.js" ]
     },
     "content_scripts": [
         {
@@ -13,8 +13,10 @@
             "js": [
                 "jquery-1.10.2.js",
                 "jquery.important.js",
+                "lodash.min.js",
                 "maximize_flash.js"
-            ]
+            ],
+            "all_frames": true
         }
     ],
     "content_security_policy": "script-src 'self'; object-src 'self'",
