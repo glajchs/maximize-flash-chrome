@@ -228,15 +228,6 @@ function getOriginalStyleAttributeName(styleAttributeName) {
     return "maximizeFlashOriginal" + styleAttributeName[0].toUpperCase() + styleAttributeName.substring(1, styleAttributeName.length);
 }
 
-function storeOffOriginalValuesIfMissing(element, styleAttributeName) {
-    if ($(element).length == 0) {
-        return;
-    }
-    if ($.data($(element).get(0), getOriginalStyleAttributeName(styleAttributeName)) == null) {
-        $.data($(element).get(0), getOriginalStyleAttributeName(styleAttributeName), $(element).get(0).style[styleAttributeName]);
-    }
-}
-
 function setStyleWithImportantFlag(element, cssProperty, cssPropertyValue) {
     $(element).important(cssProperty, false);
     $(element).css(cssProperty, cssPropertyValue, true);

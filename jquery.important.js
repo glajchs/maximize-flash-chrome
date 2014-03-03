@@ -11,14 +11,17 @@
     license
         opensource.org/licenses/mit-license.php
         
-    v0.1
+    v0.2
 
 *//*
     creates methods
-        jQuery.important()
-        jQuery(elem).important()
-        
-    optionally modified the native jQuery CSS methods: css(), width(), height(), animate(), show() and hide(), allowing an optional last argument of boolean true, to pass the request through the !important function
+        jQuery.important(boolean)
+        jQuery(elem).important(boolean)
+        jQuery(elem).isStyleNameSet()
+        jQuery(elem).isImportant()
+
+    and wraps the native jQuery CSS methods: css(), width(), height(),
+    allowing an optional last argument of boolean true, to pass the request through the !important function
     
     use jQuery.important.noConflict() to revert back to the native jQuery methods, and returns the overriding methods
     
@@ -43,24 +46,26 @@
     }
     // create CSS text from property & value, optionally inserting it into the supplied CSS rule
     // e.g. declaration('width', '50%', 'margin:2em; width:auto;');
-    function cssDeclaration(property, value, rules){ // if value === null, then remove from style; if style then merge with that
-    
-        var oldDeclaration, newDeclaration, makeImportant;
+    function cssDeclaration(property, value, rules, makeImportant, elem){ // if value === null, then remove from style; if style then merge with that
+        var oldDeclaration, newDeclaration;
         
         rules = rules || '';
         oldDeclaration = find(property, rules);
-            
+
         if (value === null){
             newDeclaration = '';
         }
         else if (typeof value === 'string'){
-            newDeclaration = property + ':' + value + ' !important;';
+            newDeclaration = property + ': ' + value + ((makeImportant) ? ' !important;' : ';');
         }
-        
+
         if (oldDeclaration){
             if (typeof value === 'boolean'){
                 makeImportant = value;
-                newDeclaration = $.important(property + ':' + oldDeclaration[2], makeImportant);
+                newDeclaration = $.important(property + ': ' + oldDeclaration[2], makeImportant);
+            }
+            if (oldDeclaration[0][0] === " ") {
+                newDeclaration = " " + newDeclaration;
             }
             rules = rules.replace(oldDeclaration[0], newDeclaration);
         }
@@ -107,77 +112,200 @@
             return toImportant(rulesets, makeImportant);
         });
     }
+
     
-    // **
-    
-    var
-        important = false,
-        original = {},
-        controller = {},
-        replacement = $.each(
-            {
-                css:
-                    function(property, value){
-                        var
-                            rulesHash = {},
-                            elem = $(this),
-                            rules = elem.attr('style');                        
-                        
-                        // Create object, if arg is a string
-                        if (typeof property === 'string'){
-                            // CSS lookup
-                            if (typeof value === 'undefined'){
-                                return original.css.apply(this, arguments);
-                            }
-                        
-                            rulesHash[property] = value;
-                        }
-                        else if (typeof property === 'object'){
-                            rulesHash = property;
-                        }
-                        else {
-                            return elem;
-                        }
-                        $.each(rulesHash, function(property, value){
-                            rules = cssDeclaration(property, value, rules);
-                        });
-                        return elem.attr('style', rules);
-                    }
-                    
-                    // TODO: other methods to be supported
-                    /*,
-                
-                    width: function(){},
-                    height: function(){},
-                    show: function(){},
-                    hide: function(){},
-                    animate: function(){}
-                    */
-            },
-            
-            function(method, fn){
-                original[method] = $.fn[method];
-                fn.overridden = true; // for detecting replacementn state
-            
-                controller[method] = function(){
-                    var
-                        args = $.makeArray(arguments),
-                        lastArg = args[args.length-1],
-                        elem = $(this);
-                    
-                    // boolean true passed as the last argument
-                    if (lastArg === true){
-                        return fn.apply(elem, args.slice(0,-1));
-                    }
-                    // $.important() === true && boolean false not passed
-                    else if (important && lastArg !== false){
-                        return fn.apply(elem, args);
-                    }
-                    // apply original, native jQuery method
-                    return original[method].apply(elem, args);
-                };
+    var important = false;
+    var original = {};
+    var controller = {};
+
+    // TODO: other methods to be supported
+    /*,
+     show: function(){},
+     hide: function(){},
+     animate: function(){}
+     */
+    $.each([ "css" ], function(index, method) {
+        original[method] = $.fn[method];
+        controller[method] = function() {
+            var args = $.makeArray(arguments);
+            var elem = $(this);
+            if (elem.length < 1) {
+                return original[method].apply(elem, args);
             }
-        );
+            if (args.length < 1) {
+                // Invalid to have no arguments, but just pass it through to let jQuery do it's default handling
+                return original[method].apply(elem);
+            } else if (typeof args[0] === "object") {
+                if (typeof args[0].length === "number") {
+                    // .css(propertyNames) --- GET
+                    return original[method].apply(elem, args);
+                } else {
+                    // .css(properties) --- SET
+                    // .css(properties, important) --- SET
+                    var returnValue = true;
+                    var propertyNames = Object.keys(args[0]);
+                    for (var i = 0; i < propertyNames.length; i++) {
+                        var propertyName = propertyNames[i];
+                        var propertyValue = args[0][propertyNames[i]];
+                        var isImportantParam = args[1];
+                        returnValue = (!returnValue) ? returnValue : applyStyleToElement(elem, propertyName,
+                                propertyValue, (isImportantParam === true || important === true), method, [propertyName, propertyValue]);
+                    }
+                    return returnValue;
+                }
+            } else if (args.length === 1) {
+                // .css(propertyName) --- GET
+                return original[method].apply(elem, args);
+            } else if (args.length >= 2) {
+                // This is a setter, using one of the following formats:
+                // .css(name, value) --- SET
+                // .css(name, function) --- SET
+                // .css(name, value, important) --- SET
+                // .css(name, function, important) --- SET
+                var propertyName = args[0];
+                var propertyValue = args[1];
+                var isImportantParam = args[2];
+                return applyStyleToElement(elem, propertyName, propertyValue, (isImportantParam === true || important === true), method, [propertyName, propertyValue]);
+            } else {
+                // This is an invalid set of arguments, or there is a bug in our processing of
+                // the different ways .css() can be called so just call the original function
+                return original[method].apply(elem, args);
+            }
+        };
+    });
+    $.each([ "width", "height" ], function(index, method) {
+        original[method] = $.fn[method];
+        controller[method] = function() {
+            var args = $.makeArray(arguments);
+            var elem = $(this);
+            if (elem.length < 1) {
+                return original[method].apply(elem, args);
+            }
+            if (args.length < 1) {
+                // .width() --- GET
+                return original[method].apply(elem);
+            } else {
+                // .width(value) --- SET
+                // .width(function) --- SET
+                // .width(value, important) --- SET
+                // .width(function, important) --- SET
+                var propertyName = method;
+                var propertyValue = args[0];
+                var isImportantParam = args[1];
+                return applyStyleToElement(elem, propertyName, propertyValue, (isImportantParam === true || important === true), method, [propertyValue]);
+            }
+        };
+    });
+
+    // Taken from jQuery 1.10.  The "ms-" conversion is because some ie styles have the leading "-"
+    function camelCaseStyleName(string) {
+        return string
+                .replace(/^-ms-/, "ms-")
+                .replace(/-([\da-z])/gi, function(all, letter) {
+                    return letter.toUpperCase();
+                });
+    }
+
+    function applyStyleToElement(elem, propertyName, propertyValue, makeImportant, method, methodArgs) {
+        var complexStyles = [
+            {
+                baseStyle: "background",
+                subStyles: [ "background-attachment", "background-color", "background-image",
+                             "background-position", "background-repeat" ]
+            },
+            {
+                baseStyle: "border-width",
+                subStyles: [ "border-top-width", "border-right-width", "border-bottom-width", "border-left-width" ]
+            },
+            {
+                baseStyle: "border-style",
+                subStyles: [ "border-top-style", "border-right-style", "border-bottom-style", "border-left-style" ]
+            },
+            {
+                baseStyle: "border-color",
+                subStyles: [ "border-top-color", "border-right-color", "border-bottom-color", "border-left-color" ]
+            },
+            {
+                baseStyle: "border",
+                subStyles: [ "border-width", "border-top-width", "border-right-width",
+                             "border-bottom-width", "border-left-width", "border-top-style",
+                             "border-right-style", "border-bottom-style", "border-left-style",
+                             "border-top-color", "border-right-color", "border-bottom-color",
+                             "border-left-color", "border-top", "border-right", "border-bottom",
+                             "border-left", "border-style", "border-spacing", "border-color",
+                             "border-collapse" ]
+            },
+            {
+                baseStyle: "font",
+                subStyles: [ "font-weight", "font-variant", "font-style", "font-size", "font-family" ]
+            },
+            {
+                baseStyle: "list-style",
+                subStyles: [ "list-style-type", "list-style-position", "list-style-image" ]
+            },
+            {
+                baseStyle: "margin",
+                subStyles: [ "margin-top", "margin-right", "margin-bottom", "margin-left" ]
+            },
+            {
+                baseStyle: "outline",
+                subStyles: [ "outline-width", "outline-style", "outline-color" ]
+            },
+            {
+                baseStyle: "padding",
+                subStyles: [ "padding-top", "padding-right", "padding-bottom", "padding-left" ]
+            }
+        ];
+
+        var existingStylesWithImportant = [];
+
+        for (var i = 0; i < complexStyles.length; i++) {
+            if (camelCaseStyleName(propertyName) === camelCaseStyleName(complexStyles[i].baseStyle)) {
+                existingStylesWithImportant.push(complexStyles[i].baseStyle);
+                $(elem).important(complexStyles[i].baseStyle, false);
+                for (var j = 0; j < complexStyles[i].subStyles.length; j++) {
+                    if (elem.isImportant(complexStyles[i].subStyles[j])) {
+                        existingStylesWithImportant.push(complexStyles[i].subStyles[j]);
+                        $(elem).important(complexStyles[i].subStyles[j], false);
+                    }
+                }
+            }
+            for (var j = 0; j < complexStyles[i].subStyles.length; j++) {
+                if (camelCaseStyleName(propertyName) === camelCaseStyleName(complexStyles[i].subStyles[j])) {
+                    if (elem.isImportant(complexStyles[i].subStyles[j])) {
+                        existingStylesWithImportant.push(complexStyles[i].subStyles[j]);
+                        $(elem).important(complexStyles[i].subStyles[j], false);
+                    }
+                    if (elem.isImportant(complexStyles[i].baseStyle)) {
+                        existingStylesWithImportant.push(complexStyles[i].baseStyle);
+                        $(elem).important(complexStyles[i].baseStyle, false);
+                    }
+                    break;
+                }
+            }
+            if ($.grep(complexStyles[i].subStyles, function(value) { return camelCaseStyleName(value) === camelCaseStyleName(propertyName); }).length > 0) {
+                if (elem.isStyleNameSet(complexStyles[i].baseStyle)) {
+                    existingStylesWithImportant.push(complexStyles[i].baseStyle);
+                    $.merge(existingStylesWithImportant, complexStyles[i].subStyles);
+                }
+            }
+        }
+        if (elem.isImportant(propertyName)) {
+            existingStylesWithImportant.push(propertyName);
+            $(elem).important(propertyName, false);
+        }
+
+        var retVal = original[method].apply(elem, methodArgs);
+
+        if (makeImportant === true) {
+            for (var i = 0; i < existingStylesWithImportant.length; i++) {
+                $(elem).important(existingStylesWithImportant[i], true);
+            }
+            $(elem).important(propertyName, true);
+        }
+
+        return retVal;
+    }
     
     // Override the native jQuery methods with new methods
     $.extend($.fn, controller);
@@ -216,28 +344,25 @@
         {
             status: important,
         
-            // release native jQuery methods back to their original versions and return overriding methods
+            // release native jQuery methods back to their original versions
             noConflict: function(){
-                $.each(original, function(method, fn){
+                $.each(original, function(method, fn) {
                     $.fn[method] = fn;
                 });
-                return replacement;
             },
             
             declaration: cssDeclaration
         }
     );
 
-    function endsWith(stringToCompare, substring) {
-        var indexOfSubstring = stringToCompare.lastIndexOf(substring);
-        return (indexOfSubstring != -1 && (indexOfSubstring + substring.length == stringToCompare.length));
-    }
-
     $.fn.getElementStyle = function(cssProperty) {
         if (typeof cssProperty !== 'string') {
             return null;
         }
         var elem = $(this);
+        if (elem.length === 0) {
+            return null;
+        }
         var existingProperty = find(cssProperty, elem.get(0).style.cssText);
         if (existingProperty == null || existingProperty.length < 3) {
             return null;
@@ -246,13 +371,35 @@
         }
     };
 
+    $.fn.isStyleNameSet = function(cssProperty) {
+        if (typeof cssProperty !== 'string') {
+            return null;
+        }
+        var elem = $(this);
+        if (elem.length === 0) {
+            return null;
+        }
+        var existingProperty = find(cssProperty, elem.get(0).style.cssText);
+        if (existingProperty == null) {
+            return null;
+        } else {
+            return true;
+        }
+    };
+
     $.fn.isImportant = function(cssProperty) {
         if (typeof cssProperty !== 'string') {
             return null;
         }
         var elem = $(this);
+        if (elem.length === 0) {
+            return null;
+        }
         var existingProperty = find(cssProperty, elem.get(0).style.cssText);
-        if (existingProperty == null || existingProperty.length < 3) {
+        if (existingProperty == null) {
+            return null;
+        }
+        if (existingProperty.length < 3) {
             return false;
         } else {
             var existingPropertyValue = $.trim(existingProperty[2]);
@@ -263,7 +410,7 @@
             }
             return false;
         }
-    }
+    };
 
     // jQuery(elem).important()
     $.fn.important = function(method){
@@ -310,22 +457,16 @@
             return elem.important.apply(this, args);
         }
         else if (typeof method === 'string'){
-            if ($.isFunction(controller[method])){
-                args = args.slice(1);
-                controller[method].apply(elem, args);
-            }
             // switch the !important statement on or off for a particular property in an element's inline styles - but instead of elem.css(property), they should directly look in the style attribute
             // e.g. $(elem).important('padding');
             // e.g. $(elem).important('padding', false);
-            else if (typeof args[1] === 'undefined' || typeof args[1] === 'boolean'){
-                property = method;
-                makeImportant = (args[1] !== false);
+            property = method;
+            makeImportant = (args[1] === true);
 
-                elem.attr(
-                    'style',
-                    cssDeclaration(property, makeImportant, elem.attr('style'))
-                );
-            }
+            elem.attr(
+                'style',
+                cssDeclaration(property, makeImportant, elem.attr('style'))
+            );
         }
         // pass a function, which will be executed while the !important flag is set to true
         /* e.g.

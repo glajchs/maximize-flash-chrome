@@ -1,17 +1,17 @@
 {
     "manifest_version": 2,
     "name": "Maximize Flash",
-    "version" : "1.0",
+    "version" : "1.1.1",
     "description": "Make a flash video use as much screen size as the tab it's in and the aspect ratio allows, without causing the video to reload.",
     "author": "Scott Glajch",
     "background": {
-        "scripts": [ "jquery-1.10.2.js", "lodash.min.js", "background.js" ]
+        "scripts": [ "lodash.min.js", "background.js" ]
     },
     "content_scripts": [
         {
             "matches": [ "<all_urls>" ],
             "js": [
-                "jquery-1.10.2.js",
+                "jquery-1.11.0.min.js",
                 "jquery.important.js",
                 "lodash.min.js",
                 "maximize_flash.js"
