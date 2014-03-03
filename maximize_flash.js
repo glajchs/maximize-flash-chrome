@@ -35,6 +35,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                     if (iframe.src == originalData.iframeURL) {
                         _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
                             restoreCSSValue(iframe, originalData.iframe, cssProperty);
+                            restoreCSSValue($(iframe).parent(), originalData.parent, cssProperty);
                         });
                     }
                 });
@@ -47,7 +48,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             _.forEach(iframes, function(iframe) {
                 if (iframe.src == request.href) {
                     originalData.iframeURL = request.href;
-                    var parentElement = $(elementToKeepMaximized).parent();
+                    var parentElement = $(iframe).parent();
                     _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
                         originalData.iframe[cssProperty] = $(iframe).get(0).style[cssProperty];
                     });
@@ -60,8 +61,18 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                         "z-index": "2147483647",
                         top: "0px",
                         left: "0px",
+                        bottom: "initial",
+                        right: "initial"
                     };
+                    if (parentElement.css("position") === "fixed") {
+                        _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
+                            originalData.parent[cssProperty] = $(iframe).parent().get(0).style[cssProperty];
+                        });
+                    }
                     setStylesWithImportantFlag(iframe, stylesToSetOnIFrame);
+                    if (parentElement.css("position") === "fixed") {
+                        setStylesWithImportantFlag(parentElement, stylesToSetOnIFrame);
+                    }
                 }
             });
             $(window).bind("resize", resizeFlash);
@@ -113,7 +124,6 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                 setStyleWithImportantFlag(parentElement, "width", newWidth + "px");
                 setStyleWithImportantFlag(parentElement, "height", newHeight + "px");
             }
-            // maximizeFlash();
         }
     }
 });
@@ -154,10 +164,11 @@ function resizeFlash() {
     }
 }
 
-var propertiesToManageForElementAndParent = [ "width", "height", "position", "z-index", "top", "left", "margin", "border" ];
+var propertiesToManageForElementAndParent = [ "width", "height", "position", "z-index", "top", "left",
+                                              "bottom", "right", "margin", "border" ];
 
 function findLargestFlashForThisFrame() {
-    var possibleElements = $("object, embed");
+    var possibleElements = $("object, embed, video");
     if (possibleElements.size() == 0) {
         return;
     } else if (possibleElements.size() == 1) {
@@ -200,7 +211,7 @@ function restoreFlash() {
         _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
             restoreCSSValue(elementToKeepMaximized, originalData.element, cssProperty);
         });
-        if (currentPosition === "relative") {
+        if (currentPosition === "relative" || $(elementToKeepMaximized).parent().css("position") === "fixed") {
             var parentElement = $(elementToKeepMaximized).parent();
             _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
                 restoreCSSValue(parentElement, originalData.parent, cssProperty);
@@ -264,13 +275,15 @@ function maximizeFlash() {
         "z-index": "2147483647",
         top: "0px",
         left: "0px",
+        bottom: "initial",
+        right: "initial"
     };
 
     _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
         originalData.element[cssProperty] = $(elementToKeepMaximized).get(0).style[cssProperty];
     });
     setStylesWithImportantFlag(elementToKeepMaximized, _.merge(_.clone(stylesToSetOnElementAndParent), { position: newPosition }));
-    if (newPosition === "relative") {
+    if (newPosition === "relative" || $(elementToKeepMaximized).parent().css("position") === "fixed") {
         var parentElement = $(elementToKeepMaximized).parent();
         _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
             originalData.parent[cssProperty] = $(parentElement).get(0).style[cssProperty];

@@ -43,9 +43,7 @@ chrome.runtime.onMessage.addListener(
             if (existingTabIndex == -1) {
                 var timeoutId = -1;
                 if (request.isFrameTop === true) {
-                    timeoutId = setTimeout(function() {
-                        sendResponseToTab(sender.tab.id);
-                    }, 20);
+                    timeoutId = sendResponseIfValid(sender.tab.id, 10);
                 }
                 var tabData = { tabId: sender.tab.id, href: request.href, area: request.area, originalAspectRatio: request.originalAspectRatio, timeoutId: timeoutId };
                 if (request.isFrameTop === true) {
@@ -64,15 +62,27 @@ chrome.runtime.onMessage.addListener(
                 }
                 if (biggestFlashPerTab[existingTabIndex].area > 1 && biggestFlashPerTab[existingTabIndex].windowWidth != null) {
                     clearTimeout(biggestFlashPerTab[existingTabIndex].timeoutId);
-                    var timeoutId = setTimeout(function() {
-                        sendResponseToTab(sender.tab.id);
-                    }, 20);
+                    var timeoutId = sendResponseIfValid(sender.tab.id, 10);
                     biggestFlashPerTab[existingTabIndex].timeoutId = timeoutId;
                 }
             }
         }
     }
 );
+
+function sendResponseIfValid(tabId, intervalsLeft) {
+    var timeoutId = setTimeout(function() {
+        var existingTabIndex = _.findIndex(biggestFlashPerTab, function(tabObject) {
+            return (tabObject.tabId === tabId);
+        });
+        if (existingTabIndex !== -1 && biggestFlashPerTab[existingTabIndex].area > 1 && biggestFlashPerTab[existingTabIndex].windowWidth != null) {
+            sendResponseToTab(tabId);
+        } else {
+            sendResponseIfValid(tabId, intervalsLeft--);
+        }
+    }, 20);
+    return timeoutId;
+}
 
 function sendResponseToTab(tabId) {
     var existingTabIndex = _.findIndex(biggestFlashPerTab, function(tabObject) {
@@ -107,6 +117,6 @@ function sendResizeEventToTab(tabId) {
         href: biggestFlashPerTab[existingTabIndex].href,
         originalAspectRatio: biggestFlashPerTab[existingTabIndex].originalAspectRatio,
         windowWidth: biggestFlashPerTab[existingTabIndex].windowWidth,
-        windowHeight: biggestFlashPerTab[existingTabIndex].windowHeight,
+        windowHeight: biggestFlashPerTab[existingTabIndex].windowHeight
     });
 }

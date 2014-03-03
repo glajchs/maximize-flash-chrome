@@ -1,0 +1,7 @@
+Version 1.1
+- Add support for HTML5 <video> taggs.
+- Fix it so that IFrames' parents get adjusted as well as the IFrame.
+
+Version 1.0
+- Now doesn't cause the flash video to reload (start from scratch).  The fact that it was doing this was a bug on some sites.
+- Works on Flash players loaded in IFrames.  It will maximize the flash object that has the largest total area.  Calculation happens every time you attempt to maximize, so videos loaded later will be considered.
