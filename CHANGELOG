@@ -1,3 +1,7 @@
+Version 1.2
+- Fix a bug where the maximize/restore icon sometimes goes away after changing pages.
+- Maximized videos after that stick around after page navigation (youtube) can now be restored by clicking on the maximize/restore icon.
+
 Version 1.1.1
 - Reduce footprint by using minified jquery.
 - Update to the latest jquery.important plugin

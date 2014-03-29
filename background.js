@@ -13,6 +13,12 @@ chrome.pageAction.onClicked.addListener(function(tab) {
     chrome.tabs.sendMessage(tab.id, { "requestType": "pageActionClicked", "actionType": actionType }, function(response) {});
 });
 
+chrome.tabs.onUpdated.addListener(function(tabId, change) {
+    if (change.status == "loading") {
+        chrome.pageAction.show(tabId);
+    }
+});
+
 var biggestFlashPerTab = [];
 
 chrome.runtime.onMessage.addListener(

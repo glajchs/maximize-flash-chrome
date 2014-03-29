@@ -1,4 +1,5 @@
 var elementToKeepMaximized = null;
+var parentOfElementToKeepMaximized = null;
 var originalData = {
     element: {},
     parent: {},
@@ -120,17 +121,12 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             setStyleWithImportantFlag(elementToKeepMaximized, "width", newWidth + "px");
             setStyleWithImportantFlag(elementToKeepMaximized, "height", newHeight + "px");
             if ($(elementToKeepMaximized).css("position") === "relative") {
-                var parentElement = $(elementToKeepMaximized).parent();
-                setStyleWithImportantFlag(parentElement, "width", newWidth + "px");
-                setStyleWithImportantFlag(parentElement, "height", newHeight + "px");
+                setStyleWithImportantFlag($(parentOfElementToKeepMaximized), "width", newWidth + "px");
+                setStyleWithImportantFlag($(parentOfElementToKeepMaximized), "height", newHeight + "px");
             }
         }
     }
 });
-
-if (window.self == window.top) {
-    chrome.runtime.sendMessage({ requestType: "initializePageActionIcon" }, function() {});
-}
 
 function resizeFlash() {
     if (elementToKeepMaximized != null) {
@@ -150,9 +146,8 @@ function resizeFlash() {
         setStyleWithImportantFlag(elementToKeepMaximized, "width", newWidth + "px");
         setStyleWithImportantFlag(elementToKeepMaximized, "height", newHeight + "px");
         if ($(elementToKeepMaximized).css("position") === "relative") {
-            var parentElement = $(elementToKeepMaximized).parent();
-            setStyleWithImportantFlag(parentElement, "width", newWidth + "px");
-            setStyleWithImportantFlag(parentElement, "height", newHeight + "px");
+            setStyleWithImportantFlag($(parentOfElementToKeepMaximized), "width", newWidth + "px");
+            setStyleWithImportantFlag($(parentOfElementToKeepMaximized), "height", newHeight + "px");
         }
     } else {
         // resize w/background page request
@@ -173,6 +168,7 @@ function findLargestFlashForThisFrame() {
         return;
     } else if (possibleElements.size() == 1) {
         elementToKeepMaximized = possibleElements.get(0);
+        parentOfElementToKeepMaximized = $(elementToKeepMaximized).parent().get(0);
     } else {
         var currentWinnerElement = possibleElements.get(0);
         for (var i = 1; i < possibleElements.size(); i++) {
@@ -183,6 +179,7 @@ function findLargestFlashForThisFrame() {
             }
         }
         elementToKeepMaximized = currentWinnerElement;
+        parentOfElementToKeepMaximized = $(elementToKeepMaximized).parent().get(0);
     }
 
     var originalWidth = $(elementToKeepMaximized).width();
@@ -211,13 +208,13 @@ function restoreFlash() {
         _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
             restoreCSSValue(elementToKeepMaximized, originalData.element, cssProperty);
         });
-        if (currentPosition === "relative" || $(elementToKeepMaximized).parent().css("position") === "fixed") {
-            var parentElement = $(elementToKeepMaximized).parent();
+        if (currentPosition === "relative" || $(parentOfElementToKeepMaximized).css("position") === "fixed") {
             _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
-                restoreCSSValue(parentElement, originalData.parent, cssProperty);
+                restoreCSSValue($(parentOfElementToKeepMaximized), originalData.parent, cssProperty);
             });
         }
         elementToKeepMaximized = null;
+        parentOfElementToKeepMaximized = null;
     }
 }
 
@@ -274,11 +271,10 @@ function maximizeFlash() {
         originalData.element[cssProperty] = $(elementToKeepMaximized).get(0).style[cssProperty];
     });
     setStylesWithImportantFlag(elementToKeepMaximized, _.merge(_.clone(stylesToSetOnElementAndParent), { position: newPosition }));
-    if (newPosition === "relative" || $(elementToKeepMaximized).parent().css("position") === "fixed") {
-        var parentElement = $(elementToKeepMaximized).parent();
+    if (newPosition === "relative" || $(parentOfElementToKeepMaximized).css("position") === "fixed") {
         _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
-            originalData.parent[cssProperty] = $(parentElement).get(0).style[cssProperty];
+            originalData.parent[cssProperty] = $(parentOfElementToKeepMaximized).get(0).style[cssProperty];
         });
-        setStylesWithImportantFlag(parentElement, _.merge(_.clone(stylesToSetOnElementAndParent), { position: "fixed" }));
+        setStylesWithImportantFlag(parentOfElementToKeepMaximized, _.merge(_.clone(stylesToSetOnElementAndParent), { position: "fixed" }));
     }
 }
