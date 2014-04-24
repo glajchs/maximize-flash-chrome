@@ -1,3 +1,6 @@
+Version 1.3
+- Make a special case for youtube HTML5 videos to expand the player controls as well.  Youtube uses a separate div for HTML5 player controls and the actual video.
+
 Version 1.2
 - Fix a bug where the maximize/restore icon sometimes goes away after changing pages.
 - Maximized videos after that stick around after page navigation (youtube) can now be restored by clicking on the maximize/restore icon.

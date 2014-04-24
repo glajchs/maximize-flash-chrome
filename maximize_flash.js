@@ -1,8 +1,10 @@
 var elementToKeepMaximized = null;
 var parentOfElementToKeepMaximized = null;
+var playerControlsElement = null;
 var originalData = {
     element: {},
     parent: {},
+    playerControls: {},
     iframe: {},
     iframeURL: ""
 };
@@ -149,6 +151,14 @@ function resizeFlash() {
             setStyleWithImportantFlag($(parentOfElementToKeepMaximized), "width", newWidth + "px");
             setStyleWithImportantFlag($(parentOfElementToKeepMaximized), "height", newHeight + "px");
         }
+        if (window.location.origin.indexOf("youtube.com") !== -1
+            && $(elementToKeepMaximized).parent(".html5-video-container").length > 0
+            && $(".html5-video-controls").length > 0
+            && playerControlsElement !== null) {
+            var playerControlsHeight = $(".html5-player-chrome").height() + 3;
+            windowHeight -= playerControlsHeight;
+            setStyleWithImportantFlag(playerControlsElement, "width", newWidth + "px");
+        }
     } else {
         // resize w/background page request
         chrome.runtime.sendMessage({
@@ -161,6 +171,8 @@ function resizeFlash() {
 
 var propertiesToManageForElementAndParent = [ "width", "height", "position", "z-index", "top", "left",
                                               "bottom", "right", "margin", "border" ];
+
+var propertiesToManageForPlayerControlsElement = [ "width", "position", "z-index", "left", "bottom" ];
 
 function findLargestFlashForThisFrame() {
     var possibleElements = $("object, embed, video");
@@ -205,6 +217,11 @@ function restoreCSSValue(element, original, cssProperty) {
 function restoreFlash() {
     if (elementToKeepMaximized != null) {
         var currentPosition = $(elementToKeepMaximized).css("position");
+        if (playerControlsElement !== null) {
+            _.forEach(propertiesToManageForPlayerControlsElement, function(cssProperty) {
+                restoreCSSValue(playerControlsElement, originalData.playerControls, cssProperty);
+            });
+        }
         _.forEach(propertiesToManageForElementAndParent, function(cssProperty) {
             restoreCSSValue(elementToKeepMaximized, originalData.element, cssProperty);
         });
@@ -242,7 +259,6 @@ function maximizeFlash() {
     if ($(elementToKeepMaximized).css("position") === "relative" || $(elementToKeepMaximized).css("position") === "static") {
         $(elementToKeepMaximized).css("position", "relative", true);
     }
-
     var windowAspectRatio = windowWidth / windowHeight;
     var newWidth = 0;
     var newHeight = 0;
@@ -276,5 +292,20 @@ function maximizeFlash() {
             originalData.parent[cssProperty] = $(parentOfElementToKeepMaximized).get(0).style[cssProperty];
         });
         setStylesWithImportantFlag(parentOfElementToKeepMaximized, _.merge(_.clone(stylesToSetOnElementAndParent), { position: "fixed" }));
+    }
+    if (window.location.origin.indexOf("youtube.com") !== -1
+        && $(elementToKeepMaximized).parent(".html5-video-container").length > 0
+        && $(".html5-video-controls").length > 0) {
+        playerControlsElement = $(".html5-video-controls").get(0);
+        var playerControlsHeight = $(".html5-player-chrome").height() + 3;
+        windowHeight -= playerControlsHeight;
+        _.forEach(propertiesToManageForPlayerControlsElement, function(cssProperty) {
+            originalData.playerControls[cssProperty] = playerControlsElement.style[cssProperty];
+        });
+        setStyleWithImportantFlag(playerControlsElement, "width", newWidth + "px");
+        setStyleWithImportantFlag(playerControlsElement, "position", "fixed");
+        setStyleWithImportantFlag(playerControlsElement, "left", "0px");
+        setStyleWithImportantFlag(playerControlsElement, "bottom", "0px");
+        setStyleWithImportantFlag(playerControlsElement, "z-index", 2147483647);
     }
 }
